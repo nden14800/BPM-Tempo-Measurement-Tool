@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPMテンポ測定ツール</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Roboto+Mono&display=swap" rel="stylesheet">
+    <style>
+        /* --- 変数定義 (ライト/ダークテーマ) --- */
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #212121;
+            --primary-color: #1976D2;
+            --primary-text-color: #ffffff;
+            --secondary-bg-color: #f5f5f5;
+            --border-color: #e0e0e0;
+            --button-reset-bg: #757575;
+            --scrollbar-thumb-color: #c1c1c1;
+            --scrollbar-track-color: var(--secondary-bg-color);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #121212;
+                --text-color: #ffffff;
+                --primary-color: #90CAF9;
+                --primary-text-color: #121212;
+                --secondary-bg-color: #1e1e1e;
+                --border-color: #424242;
+                --button-reset-bg: #616161;
+                --scrollbar-thumb-color: #555;
+                --scrollbar-track-color: var(--secondary-bg-color);
+            }
+        }
+
+        /* --- 純粋なフェードインアニメーション --- */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* --- 基本スタイル --- */
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 600px;
+            padding: 20px 10px;
+            display: flex;
+            flex-direction: column;
+            max-height: 95vh;
+        }
+        
+        /* ▼▼▼ 追加点 ▼▼▼ */
+        /* --- サイトタイトル --- */
+        .site-title {
+            margin-bottom: 25px;
+            opacity: 0; /* アニメーションの初期状態 */
+            animation: fadeIn 0.5s ease-in-out forwards;
+            animation-delay: 0.1s; /* 最初に表示 */
+        }
+        
+        .site-title h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--text-color);
+        }
+        /* ▲▲▲ 追加点 ▲▲▲ */
+        
+        /* --- BPM表示エリア --- */
+        .bpm-display {
+            opacity: 0; /* アニメーションの初期状態 */
+            animation: fadeIn 0.5s ease-in-out forwards;
+            animation-delay: 0.2s; /* タイトルの次に表示 */
+        }
+
+        .bpm-display h1 {
+            font-size: 5rem;
+            margin: 0;
+            line-height: 1;
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        .bpm-display p {
+            font-size: 1.5rem;
+            margin: 5px 0 30px 0;
+            color: var(--text-color);
+        }
+
+        .bpm-display #bpmValue {
+            min-height: 75px;
+            display: inline-block;
+        }
+
+        .bpm-display #tapCount {
+            font-size: 1.2rem;
+            opacity: 0.7;
+        }
+
+        /* --- ボタンエリア --- */
+        .buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+            opacity: 0; /* アニメーションの初期状態 */
+            animation: fadeIn 0.5s ease-in-out forwards;
+            animation-delay: 0.3s; /* BPM表示の次に表示 */
+        }
+
+        button {
+            font-family: 'Roboto', sans-serif;
+            font-size: 1.2rem;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.1s ease, background-color 0.2s ease;
+            color: var(--primary-text-color);
+            font-weight: 700;
+        }
+        
+        button:active {
+            transform: scale(0.97);
+        }
+
+        #tapButton {
+            background-color: var(--primary-color);
+            flex-grow: 1;
+        }
+
+        #resetButton {
+            background-color: var(--button-reset-bg);
+        }
+
+        /* --- ログエリア --- */
+        .log-container {
+            margin-top: 20px;
+            background-color: var(--secondary-bg-color);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            position: relative;
+            max-height: 300px; 
+            overflow-y: auto; 
+            opacity: 0; /* JSで表示するまで非表示 & アニメーションの初期状態 */
+        }
+        
+        .log-container.visible {
+            opacity: 1;
+            animation: fadeIn 0.5s ease-in-out forwards;
+        }
+
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .log-table th, .log-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+        
+        .log-table thead th {
+            background-color: var(--secondary-bg-color);
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .log-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        /* 新しいログ行が追加された時のアニメーション */
+        .log-entry-animation {
+            opacity: 0; /* アニメーションの初期状態 */
+            animation: fadeIn 0.4s ease-in-out forwards;
+        }
+
+        /* --- スクロールバーのスタイル --- */
+        .log-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-container::-webkit-scrollbar-track {
+            background: var(--scrollbar-track-color);
+            border-radius: 8px;
+        }
+
+        .log-container::-webkit-scrollbar-thumb {
+            background-color: var(--scrollbar-thumb-color);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        
+        <!-- ▼▼▼ 追加点 ▼▼▼ -->
+        <div class="site-title">
+            <h2>BPMテンポ測定ツール</h2>
+        </div>
+        <!-- ▲▲▲ 追加点 ▲▲▲ -->
+
+        <div class="bpm-display">
+            <h1><span id="bpmValue">0.00</span></h1>
+            <p>BPM <span id="tapCount">(0)</span></p>
+        </div>
+
+        <div class="buttons">
+            <button id="tapButton">タップ (Space)</button>
+            <button id="resetButton">リセット (R)</button>
+        </div>
+
+        <div class="log-container" id="logWrapper">
+            <table class="log-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>時刻</th>
+                        <th>Total</th>
+                        <th>Lap</th>
+                        <th>Inst. BPM</th>
+                        <th>Avg. BPM</th>
+                    </tr>
+                </thead>
+                <tbody id="logBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM要素の取得 ---
+        const bpmValueEl = document.getElementById('bpmValue');
+        const tapCountEl = document.getElementById('tapCount');
+        const tapButton = document.getElementById('tapButton');
+        const resetButton = document.getElementById('resetButton');
+        const logWrapper = document.getElementById('logWrapper');
+        const logBody = document.getElementById('logBody');
+
+        // --- 変数定義 ---
+        let taps = [];
+        let startTime = null;
+        const MAX_LOGS = 100;
+
+        // --- 初期化 ---
+        logWrapper.style.display = 'none';
+
+        // --- イベントリスナー ---
+        tapButton.addEventListener('click', handleTap);
+        resetButton.addEventListener('click', handleReset);
+        document.addEventListener('keydown', handleKeyPress);
+        
+        // --- 関数定義 ---
+
+        /**
+         * タップ時の処理
+         */
+        function handleTap() {
+            const now = performance.now(); // 高精度なタイムスタンプ
+
+            if (startTime === null) {
+                startTime = now;
+            }
+
+            taps.push(now);
+            updateDisplay();
+            addLog(now);
+        }
+
+        /**
+         * リセット時の処理
+         */
+        function handleReset() {
+            taps = [];
+            startTime = null;
+            bpmValueEl.textContent = '0.00';
+            tapCountEl.textContent = '(0)';
+            logBody.innerHTML = '';
+            logWrapper.style.display = 'none';
+            logWrapper.classList.remove('visible');
+        }
+
+        /**
+         * キープレス時の処理
+         * @param {KeyboardEvent} e 
+         */
+        function handleKeyPress(e) {
+            if (e.code === 'Space') {
+                e.preventDefault(); // スペースキーでのスクロールを防止
+                handleTap();
+            } else if (e.key.toLowerCase() === 'r') {
+                handleReset();
+            }
+        }
+
+        /**
+         * 画面表示の更新
+         */
+        function updateDisplay() {
+            const count = taps.length;
+            tapCountEl.textContent = `(${count})`;
+
+            if (count < 2) {
+                return;
+            }
+
+            const averageBpm = calculateAverageBpm();
+            bpmValueEl.textContent = averageBpm.toFixed(2);
+        }
+
+        /**
+         * ログの追加
+         * @param {number} currentTime - 現在のタップ時刻
+         */
+        function addLog(currentTime) {
+            // 最初のタップでログコンテナを表示し、フェードインさせる
+            if (logWrapper.style.display === 'none') {
+                logWrapper.style.display = 'block';
+                logWrapper.classList.add('visible');
+            }
+            
+            const count = taps.length;
+            const time = formatTime(new Date());
+            const totalTime = ((currentTime - startTime) / 1000).toFixed(2) + 's';
+            
+            let lapTime = '0.00s';
+            let instantBpm = 0;
+            if (count > 1) {
+                const prevTime = taps[count - 2];
+                const lap = currentTime - prevTime;
+                lapTime = (lap / 1000).toFixed(2) + 's';
+                instantBpm = 60000 / lap;
+            }
+
+            const averageBpm = calculateAverageBpm();
+            
+            // 新しいログ行を作成
+            const newRow = document.createElement('tr');
+            newRow.classList.add('log-entry-animation'); // フェードインアニメーション用クラス
+            newRow.innerHTML = `
+                <td>${count}</td>
+                <td>${time}</td>
+                <td>${totalTime}</td>
+                <td>${lapTime}</td>
+                <td>${instantBpm.toFixed(2)}</td>
+                <td>${averageBpm.toFixed(2)}</td>
+            `;
+
+            // 先頭にログを追加
+            logBody.prepend(newRow);
+
+            // ログが100件を超えたら古いものを削除
+            if (logBody.children.length > MAX_LOGS) {
+                logBody.lastElementChild.remove();
+            }
+        }
+
+        /**
+         * 平均BPMの計算
+         * @returns {number} 平均BPM
+         */
+        function calculateAverageBpm() {
+            const count = taps.length;
+            if (count < 2) {
+                return 0;
+            }
+            const duration = (taps[count - 1] - startTime) / 60000;
+            return (count - 1) / duration;
+        }
+        
+        /**
+         * 時刻を HH:mm:ss.SSS 形式にフォーマット
+         * @param {Date} date - Dateオブジェクト
+         * @returns {string} フォーマットされた時刻文字列
+         */
+        function formatTime(date) {
+            const h = String(date.getHours()).padStart(2, '0');
+            const m = String(date.getMinutes()).padStart(2, '0');
+            const s = String(date.getSeconds()).padStart(2, '0');
+            const ms = String(date.getMilliseconds()).padStart(3, '0');
+            return `${h}:${m}:${s}.${ms}`;
+        }
+
+    </script>
+</body>
+</html>
